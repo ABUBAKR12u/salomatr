@@ -3,6 +3,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
+// Eng asosiy o'zgarish: ID raqam endi matn (String) formatida
 define('TOKEN', '8556626236:AAHraU5HfOIKOZUDJOAc3i6rV5SYuW3vTf4');
 define('ADMIN_ID', '8105737095'); 
 define('DB_FILE', 'database.json');
@@ -79,7 +80,7 @@ function getAdminKeyboard() {
 
 if (isset($update['chat_join_request'])) {
     $cjr = $update['chat_join_request'];
-    $userId = trim((string)$cjr['from']['id']);
+    $userId = (string)$cjr['from']['id'];
     $chatId = (string)$cjr['chat']['id'];
     if (isset($db['channels'][$chatId]) && $db['channels'][$chatId] === 'yopiq') {
         if (!isset($db['requests'][$userId])) $db['requests'][$userId] = [];
@@ -95,7 +96,9 @@ if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $cbId = $callback['id'];
     $chatId = $callback['message']['chat']['id'];
-    $userId = trim((string)$callback['from']['id']); 
+    
+    // Yechim: userId qat'iy matn sifatida olinadi
+    $userId = (string)$callback['from']['id']; 
     $data = $callback['data'];
 
     bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
@@ -133,8 +136,8 @@ if (isset($update['callback_query'])) {
         exit;
     }
 
-    // Tuzatildi: == operatori va admin tekshiruvi xavfsiz holatga keltirildi
-    if ($userId == trim(ADMIN_ID)) {
+    // Yechim: ADMIN_ID bilan matnli aniq tekshiruv (===)
+    if ($userId === ADMIN_ID) {
         if ($data === 'adm_add_ch') {
             $db['states'][$userId] = 'wait_ch_id';
             saveDB($db);
@@ -195,11 +198,11 @@ if (isset($update['callback_query'])) {
 if (isset($update['message'])) {
     $message = $update['message'];
     $chatId = $message['chat']['id'];
-    $userId = trim((string)$message['from']['id']);
+    $userId = (string)$message['from']['id']; // Yechim: matn
     $text = isset($message['text']) ? trim($message['text']) : '';
     $state = isset($db['states'][$userId]) ? $db['states'][$userId] : '';
 
-    if ($userId != trim(ADMIN_ID)) {
+    if ($userId !== ADMIN_ID) {
         if (!checkSubscription($userId, $db)) {
             bot('sendMessage', [
                 'chat_id' => $chatId,
@@ -239,7 +242,7 @@ if (isset($update['message'])) {
         }
     }
 
-    if ($userId == trim(ADMIN_ID)) {
+    if ($userId === ADMIN_ID) {
         if ($text === '/start') {
             unset($db['states'][$userId]);
             saveDB($db);
