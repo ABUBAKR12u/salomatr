@@ -59,15 +59,12 @@ function getRemainingChannels($userId) {
     foreach ($db['channels'] as $channel) {
         $joined = false;
         
-        // Faqat yopiq kanallar uchun request tekshirish
         if ($channel['type'] == 'closed') {
             $userRequests = isset($db['requests'][$userId]) ? array_map('strval', $db['requests'][$userId]) : [];
             if (in_array((string)$channel['id'], $userRequests)) {
                 $joined = true;
             }
         }
-        // Ochiq kanallar uchun - bot admin bo'lishi kerak, aks holda tekshirolmaymiz
-        // Shuning uchun ochiq kanallar uchun faqat link beramiz, tekshirmaymiz
         
         if (!$joined) $remaining[] = $channel;
     }
@@ -107,12 +104,10 @@ if (isset($update['callback_query'])) {
         if (empty($remaining)) {
             bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "✅ Tasdiqlandi!"]);
             
-            $newText = "✅ Xush kelibsiz!\n\n/animes - animelar ro'yxati";
             bot('editMessageText', [
                 'chat_id' => $chatId,
                 'message_id' => $messageId,
-                'text' => $newText,
-                'reply_markup' => json_encode(['inline_keyboard' => []])
+                'text' => "✅ Xush kelibsiz!\n\n/animes - animelar"
             ]);
         } else {
             bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "❌ A'zo bo'lmadingiz!", 'show_alert' => true]);
@@ -171,7 +166,7 @@ if (isset($update['message'])) {
                 bot('sendMessage', [
                     'chat_id' => $chatId,
                     'text' => "✅ Saqlandi!\n\n📺 $animeName\n🔑 Kod: $code",
-                    'reply_markup' => json_encode(adminKeyboard())
+                    'reply_markup' => adminKeyboard()
                 ]);
                 
                 unlink($stateFile);
@@ -223,7 +218,7 @@ if (isset($update['message'])) {
                 bot('sendMessage', [
                     'chat_id' => $chatId,
                     'text' => "✅ Qism $nextEpisode qo'shildi!",
-                    'reply_markup' => json_encode(adminKeyboard())
+                    'reply_markup' => adminKeyboard()
                 ]);
                 
                 unlink($stateFile);
@@ -328,14 +323,13 @@ function showAdminMenu($chatId) {
     bot('sendMessage', [
         'chat_id' => $chatId,
         'text' => "👑 Admin",
-        'reply_markup' => json_encode(adminKeyboard())
+        'reply_markup' => adminKeyboard()
     ]);
 }
 
 function handleAddChannel($chatId, $text) {
     global $db;
     
-    // Faqat yopiq kanal qo'shamiz (ochiq kanal uchun bot admin bo'lishi kerak)
     if (strpos($text, '-') === 0 && is_numeric($text)) {
         $db['channels'][] = ['id' => $text, 'type' => 'closed', 'display_name' => 'Yopiq'];
         saveDB($db);
@@ -424,7 +418,7 @@ function showChannelJoinPrompt($chatId, $userId, $messageId = null) {
     $params = [
         'chat_id' => $chatId,
         'text' => $text,
-        'reply_markup' => json_encode($keyboard)
+        'reply_markup' => $keyboard
     ];
     
     if ($messageId) {
@@ -456,7 +450,7 @@ function showUserAnimesList($chatId) {
     bot('sendMessage', [
         'chat_id' => $chatId,
         'text' => $text,
-        'reply_markup' => json_encode($keyboard)
+        'reply_markup' => $keyboard
     ]);
 }
 
@@ -517,6 +511,6 @@ function sendEpisodeWithButtons($chatId, $animeCode, $episodeNum) {
         'chat_id' => $chatId,
         'video' => $fileId,
         'caption' => "🎬 {$anime['name']}\n📹 $episodeNum/$totalEpisodes",
-        'reply_markup' => json_encode($keyboard)
+        'reply_markup' => $keyboard
     ]);
 }
