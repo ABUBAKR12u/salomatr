@@ -42,14 +42,14 @@ function generateNumericCode() {
 }
 
 function adminKeyboard() {
-    return json_encode([
+    return [
         'keyboard' => [
             ['📢 Kanal', '📋 Kanallar'],
             ['🎬 Anime', '📚 Animelar'],
             ['➕ Qism']
         ],
         'resize_keyboard' => true
-    ]);
+    ];
 }
 
 function getRemainingChannels($userId) {
@@ -59,22 +59,15 @@ function getRemainingChannels($userId) {
     foreach ($db['channels'] as $channel) {
         $joined = false;
         
-        if ($channel['type'] == 'open') {
-            $result = bot('getChatMember', ['chat_id' => $channel['link'], 'user_id' => $userId]);
-            if (isset($result['result']) && in_array($result['result']['status'], ['member', 'administrator', 'creator'])) {
-                $joined = true;
-            }
-        } else {
+        // Faqat yopiq kanallar uchun request tekshirish
+        if ($channel['type'] == 'closed') {
             $userRequests = isset($db['requests'][$userId]) ? array_map('strval', $db['requests'][$userId]) : [];
             if (in_array((string)$channel['id'], $userRequests)) {
                 $joined = true;
-            } else {
-                $result = bot('getChatMember', ['chat_id' => $channel['id'], 'user_id' => $userId]);
-                if (isset($result['result']) && in_array($result['result']['status'], ['member', 'administrator', 'creator'])) {
-                    $joined = true;
-                }
             }
         }
+        // Ochiq kanallar uchun - bot admin bo'lishi kerak, aks holda tekshirolmaymiz
+        // Shuning uchun ochiq kanallar uchun faqat link beramiz, tekshirmaymiz
         
         if (!$joined) $remaining[] = $channel;
     }
@@ -113,10 +106,13 @@ if (isset($update['callback_query'])) {
         
         if (empty($remaining)) {
             bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "✅ Tasdiqlandi!"]);
+            
+            $newText = "✅ Xush kelibsiz!\n\n/animes - animelar ro'yxati";
             bot('editMessageText', [
                 'chat_id' => $chatId,
                 'message_id' => $messageId,
-                'text' => "✅ Xush kelibsiz!\n\n/animes - animelar ro'yxati"
+                'text' => $newText,
+                'reply_markup' => json_encode(['inline_keyboard' => []])
             ]);
         } else {
             bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "❌ A'zo bo'lmadingiz!", 'show_alert' => true]);
@@ -175,7 +171,7 @@ if (isset($update['message'])) {
                 bot('sendMessage', [
                     'chat_id' => $chatId,
                     'text' => "✅ Saqlandi!\n\n📺 $animeName\n🔑 Kod: $code",
-                    'reply_markup' => adminKeyboard()
+                    'reply_markup' => json_encode(adminKeyboard())
                 ]);
                 
                 unlink($stateFile);
@@ -227,7 +223,7 @@ if (isset($update['message'])) {
                 bot('sendMessage', [
                     'chat_id' => $chatId,
                     'text' => "✅ Qism $nextEpisode qo'shildi!",
-                    'reply_markup' => adminKeyboard()
+                    'reply_markup' => json_encode(adminKeyboard())
                 ]);
                 
                 unlink($stateFile);
@@ -256,7 +252,7 @@ if (isset($update['message'])) {
         }
         
         if ($text == '📢 Kanal') {
-            bot('sendMessage', ['chat_id' => $chatId, 'text' => "📌 Link yoki ID yuboring:"]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "📌 Yopiq kanal ID yuboring (-100...):"]);
             file_put_contents('admin_state_' . $userId, 'waiting_channel');
             exit;
         }
@@ -332,23 +328,20 @@ function showAdminMenu($chatId) {
     bot('sendMessage', [
         'chat_id' => $chatId,
         'text' => "👑 Admin",
-        'reply_markup' => adminKeyboard()
+        'reply_markup' => json_encode(adminKeyboard())
     ]);
 }
 
 function handleAddChannel($chatId, $text) {
     global $db;
     
-    if (strpos($text, 't.me/') !== false || strpos($text, 'https://') !== false) {
-        $db['channels'][] = ['id' => 'link_' . md5($text), 'type' => 'open', 'link' => $text, 'display_name' => 'Ochiq'];
+    // Faqat yopiq kanal qo'shamiz (ochiq kanal uchun bot admin bo'lishi kerak)
+    if (strpos($text, '-') === 0 && is_numeric($text)) {
+        $db['channels'][] = ['id' => $text, 'type' => 'closed', 'display_name' => 'Yopiq'];
         saveDB($db);
-        bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Ochiq kanal"]);
-    } elseif (strpos($text, '-') === 0 && is_numeric($text)) {
-        $db['channels'][] = ['id' => $text, 'type' => 'closed', 'link' => '', 'display_name' => 'Yopiq'];
-        saveDB($db);
-        bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Yopiq kanal"]);
+        bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Yopiq kanal qo'shildi"]);
     } else {
-        bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Noto'g'ri"]);
+        bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Faqat yopiq kanal ID (-100...)"]);
     }
 }
 
@@ -362,9 +355,7 @@ function showChannelsList($chatId) {
     
     $text = "📋 Kanallar:\n\n";
     foreach ($db['channels'] as $index => $channel) {
-        $icon = $channel['type'] == 'open' ? '🔓' : '🔒';
-        $info = $channel['type'] == 'open' ? $channel['link'] : $channel['id'];
-        $text .= "$icon #" . ($index + 1) . " - $info\n";
+        $text .= "🔒 #" . ($index + 1) . " - " . $channel['id'] . "\n";
     }
     $text .= "\n/delete_channel_<raqam>";
     
@@ -413,21 +404,15 @@ function showChannelJoinPrompt($chatId, $userId, $messageId = null) {
         foreach ($channelsToJoin as $index => $channel) {
             $num = $index + 1;
             
-            if ($channel['type'] == 'open') {
+            $linkRes = bot('createChatInviteLink', [
+                'chat_id' => $channel['id'],
+                'creates_join_request' => true
+            ]);
+            
+            if (isset($linkRes['result']['invite_link'])) {
                 $keyboard['inline_keyboard'][] = [
-                    ['text' => "Kanal $num", 'url' => $channel['link']]
+                    ['text' => "Kanal $num", 'url' => $linkRes['result']['invite_link']]
                 ];
-            } else {
-                $linkRes = bot('createChatInviteLink', [
-                    'chat_id' => $channel['id'],
-                    'creates_join_request' => true
-                ]);
-                
-                if (isset($linkRes['result']['invite_link'])) {
-                    $keyboard['inline_keyboard'][] = [
-                        ['text' => "Kanal $num", 'url' => $linkRes['result']['invite_link']]
-                    ];
-                }
             }
         }
         
