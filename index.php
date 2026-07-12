@@ -1,10 +1,11 @@
 <?php
 
-error_reporting(0);
+error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
+// Eng asosiy o'zgarish: ID raqam endi matn (String) formatida
 define('TOKEN', '8556626236:AAHraU5HfOIKOZUDJOAc3i6rV5SYuW3vTf4');
-define('ADMIN_ID', 8105737095);
+define('ADMIN_ID', '8105737095'); 
 define('DB_FILE', 'database.json');
 
 $content = file_get_contents("php://input");
@@ -95,21 +96,23 @@ if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $cbId = $callback['id'];
     $chatId = $callback['message']['chat']['id'];
-    $userId = (string)$callback['from']['id'];
+    
+    // Yechim: userId qat'iy matn sifatida olinadi
+    $userId = (string)$callback['from']['id']; 
     $data = $callback['data'];
+
+    bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
 
     if ($data === 'check_sub') {
         if (checkSubscription($userId, $db)) {
-            bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "Muvaffaqiyatli tasdiqlandi! ✅"]);
-            bot('sendMessage', ['chat_id' => $chatId, 'text' => "👋 Xush kelibsiz! Anime kodini yuborishingiz mumkin 🔍"]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "Muvaffaqiyatli tasdiqlandi! ✅\n👋 Xush kelibsiz! Anime kodini yuborishingiz mumkin 🔍"]);
         } else {
-            bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "Hamma kanallarga a'zo bo'lmadingiz! ❌", 'show_alert' => true]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Hamma kanallarga a'zo bo'lmadingiz yoki so'rov yubormadingiz! Iltimos, qaytadan tekshiring."]);
         }
         exit;
     }
 
     if (strpos($data, 'view_part_') === 0) {
-        bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
         $parts = explode('_', $data);
         $animeId = $parts[2];
         $partNum = $parts[3];
@@ -133,9 +136,8 @@ if (isset($update['callback_query'])) {
         exit;
     }
 
-    if ($userId == ADMIN_ID) {
-        bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
-
+    // Yechim: ADMIN_ID bilan matnli aniq tekshiruv (===)
+    if ($userId === ADMIN_ID) {
         if ($data === 'adm_add_ch') {
             $db['states'][$userId] = 'wait_ch_id';
             saveDB($db);
@@ -196,11 +198,11 @@ if (isset($update['callback_query'])) {
 if (isset($update['message'])) {
     $message = $update['message'];
     $chatId = $message['chat']['id'];
-    $userId = (string)$message['from']['id'];
+    $userId = (string)$message['from']['id']; // Yechim: matn
     $text = isset($message['text']) ? trim($message['text']) : '';
     $state = isset($db['states'][$userId]) ? $db['states'][$userId] : '';
 
-    if ($userId != ADMIN_ID) {
+    if ($userId !== ADMIN_ID) {
         if (!checkSubscription($userId, $db)) {
             bot('sendMessage', [
                 'chat_id' => $chatId,
@@ -240,7 +242,7 @@ if (isset($update['message'])) {
         }
     }
 
-    if ($userId == ADMIN_ID) {
+    if ($userId === ADMIN_ID) {
         if ($text === '/start') {
             unset($db['states'][$userId]);
             saveDB($db);
