@@ -54,6 +54,47 @@ if (isset($update['chat_join_request'])) {
     exit;
 }
 
+if (isset($update['callback_query'])) {
+    $callback = $update['callback_query'];
+    $cbId = $callback['id'];
+    $chatId = $callback['message']['chat']['id'];
+    $userId = (string)$callback['from']['id'];
+    $data = $callback['data'];
+
+    if ($data == 'check_request') {
+        $allApproved = true;
+        if (!empty($db['channels'])) {
+            foreach ($db['channels'] as $chId) {
+                $chIdStr = (string)$chId;
+                $userRequests = isset($db['requests'][$userId]) ? array_map('strval', $db['requests'][$userId]) : [];
+                if (!in_array($chIdStr, $userRequests)) {
+                    $allApproved = false;
+                    break;
+                }
+            }
+        }
+
+        if ($allApproved) {
+            bot('answerCallbackQuery', [
+                'callback_query_id' => $cbId,
+                'text' => "Muvaffaqiyatli tasdiqlandi! ✅",
+                'show_alert' => false
+            ]);
+            bot('sendMessage', [
+                'chat_id' => $chatId,
+                'text' => "Xush kelibsiz! 🎉 Endi anime kodini yuborishingiz mumkin 💬"
+            ]);
+        } else {
+            bot('answerCallbackQuery', [
+                'callback_query_id' => $cbId,
+                'text' => "Siz hali so'rov yubormadingiz! ❌",
+                'show_alert' => true
+            ]);
+        }
+    }
+    exit;
+}
+
 if (isset($update['message'])) {
     $message = $update['message'];
     $chatId = $message['chat']['id'];
@@ -76,10 +117,11 @@ if (isset($update['message'])) {
                         $inviteLink = $linkRes['result']['invite_link'];
                         bot('sendMessage', [
                             'chat_id' => $chatId,
-                            'text' => "Botdan foydalanish uchun quyidagi yopiq kanalga qo'shilish so'rovini yuboring:",
+                            'text' => "🛑 Botdan foydalanish uchun quyidagi yopiq kanalga qo'shilish so'rovini yuboring:",
                             'reply_markup' => json_encode([
                                 'inline_keyboard' => [
-                                    [['text' => "Kanalga so'rov yuborish", 'url' => $inviteLink]]
+                                    [['text' => "📢 Kanalga so'rov yuborish", 'url' => $inviteLink]],
+                                    [['text' => "🔄 A'zolikni tekshirish", 'callback_data' => 'check_request']]
                                 ]
                             ])
                         ]);
@@ -92,7 +134,7 @@ if (isset($update['message'])) {
         if ($text == '/start') {
             bot('sendMessage', [
                 'chat_id' => $chatId,
-                'text' => "Salom! Anime kodini yuboring."
+                'text' => "👋 Salom! Anime kodini yuboring 🔍"
             ]);
             exit;
         }
@@ -103,12 +145,12 @@ if (isset($update['message'])) {
                 bot('sendVideo', [
                     'chat_id' => $chatId,
                     'video' => $fileId,
-                    'caption' => "Kod: " . $text
+                    'caption' => "🎬 Kod: " . $text
                 ]);
             } else {
                 bot('sendMessage', [
                     'chat_id' => $chatId,
-                    'text' => "Afsuski, bu kodga tegishli anime topilmadi."
+                    'text' => "🤷‍♂️ Afsuski, bu kodga tegishli anime topilmadi."
                 ]);
             }
             exit;
@@ -119,7 +161,7 @@ if (isset($update['message'])) {
         if ($text == '/start') {
             bot('sendMessage', [
                 'chat_id' => $chatId,
-                'text' => "Admin panelga xush kelibsiz!\n\nKanal qo'shish uchun faqat ID yuboring (Masalan: -100123456789)\nAnime qo'shish uchun videoga caption yozib yuboring."
+                'text' => "👑 Admin panelga xush kelibsiz!\n\n🔗 Kanal qo'shish uchun faqat ID yuboring (Masalan: -100123456789)\n📥 Anime qo'shish uchun videoga caption yozib yuboring."
             ]);
             exit;
         }
@@ -130,12 +172,12 @@ if (isset($update['message'])) {
                 saveDB($db);
                 bot('sendMessage', [
                     'chat_id' => $chatId,
-                    'text' => "Yopiq kanal muvaffaqiyatli qo'shildi ID: " . $text
+                    'text' => "✅ Yopiq kanal muvaffaqiyatli qo'shildi ID: " . $text
                 ]);
             } else {
                 bot('sendMessage', [
                     'chat_id' => $chatId,
-                    'text' => "Bu kanal allaqachon qo'shilgan."
+                    'text' => "⚠️ Bu kanal allaqachon qo'shilgan."
                 ]);
             }
             exit;
@@ -150,12 +192,12 @@ if (isset($update['message'])) {
                 saveDB($db);
                 bot('sendMessage', [
                     'chat_id' => $chatId,
-                    'text' => "Anime muvaffaqiyatli saqlandi! Kod: " . $caption
+                    'text' => "💾 Anime muvaffaqiyatli saqlandi! Kod: " . $caption
                 ]);
             } else {
                 bot('sendMessage', [
                     'chat_id' => $chatId,
-                    'text' => "Xatolik: Videoga caption (tavsif) sifatida anime kodini yozib yuboring."
+                    'text' => "❌ Xatolik: Videoga caption (tavsif) sifatida anime kodini yozib yuboring."
                 ]);
             }
             exit;
