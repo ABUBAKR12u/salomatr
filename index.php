@@ -18,28 +18,14 @@ if (!$update) {
  DB STRUKTURASI:
  $db = [
      'animes' => [
-         '0001' => [
-             'name' => 'Anime nomi',
-             'parts' => [
-                 1 => 'file_id_1',
-                 2 => 'file_id_2',
-             ]
-         ],
+         '1' => ['name' => 'Anime nomi', 'parts' => [1 => 'file_id', 2 => 'file_id']],
      ],
      'channels' => [
-         '-100123456789' => ['type' => 'open'],   // faqat a'zo bo'lish kifoya
-         '-100987654321' => ['type' => 'closed'],  // join request kerak
+         '-100123456789' => ['type' => 'open'],
+         '-100987654321' => ['type' => 'closed'],
      ],
-     'requests' => [
-         'userId' => ['-100123456789', ...]  // approved bo'lgan (open uchun ham, closed uchun ham) kanallar
-     ],
-     'states' => [
-         'userId' => ['action' => 'awaiting_anime_name'] yoki
-                     ['action' => 'awaiting_anime_video', 'code' => '0001'] yoki
-                     ['action' => 'awaiting_part_code'] yoki
-                     ['action' => 'awaiting_part_video', 'code' => '0001'] yoki
-                     ['action' => 'awaiting_channel_id', 'type' => 'open'/'closed']
-     ],
+     'requests' => ['userId' => ['-100123456789', ...]],
+     'states' => ['userId' => [...]],
      'last_anime_num' => 0
  ]
 */
@@ -94,8 +80,6 @@ function markApproved(&$db, $userId, $chatId) {
     }
 }
 
-// Foydalanuvchi barcha kanallarga (ochiq + yopiq) a'zo/approved bo'lganini tekshiradi.
-// Ochiq kanallar uchun getChatMember orqali real vaqtda tekshiradi.
 function checkAllChannels($db, $userId) {
     $missing = [];
     if (empty($db['channels'])) {
@@ -108,10 +92,7 @@ function checkAllChannels($db, $userId) {
         $type = isset($info['type']) ? $info['type'] : 'closed';
 
         if ($type === 'open') {
-            $res = bot('getChatMember', [
-                'chat_id' => $chIdStr,
-                'user_id' => $userId
-            ]);
+            $res = bot('getChatMember', ['chat_id' => $chIdStr, 'user_id' => $userId]);
             $status = isset($res['result']['status']) ? $res['result']['status'] : 'left';
             if (!in_array($status, ['member', 'administrator', 'creator'])) {
                 $missing[$chIdStr] = $info;
@@ -138,24 +119,21 @@ function sendChannelsPrompt($chatId, $missing) {
                 $inviteLink = isset($linkRes['result']['invite_link']) ? $linkRes['result']['invite_link'] : null;
             }
             if ($inviteLink) {
-                $buttons[] = [['text' => "📢 Kanal #$i ga a'zo bo'lish", 'url' => $inviteLink]];
+                $buttons[] = [['text' => "Kanal #$i", 'url' => $inviteLink]];
             }
         } else {
-            $linkRes = bot('createChatInviteLink', [
-                'chat_id' => $chId,
-                'creates_join_request' => true
-            ]);
+            $linkRes = bot('createChatInviteLink', ['chat_id' => $chId, 'creates_join_request' => true]);
             if (isset($linkRes['result']['invite_link'])) {
-                $buttons[] = [['text' => "📢 Kanal #$i ga so'rov yuborish", 'url' => $linkRes['result']['invite_link']]];
+                $buttons[] = [['text' => "Kanal #$i", 'url' => $linkRes['result']['invite_link']]];
             }
         }
         $i++;
     }
-    $buttons[] = [['text' => "🔄 A'zolikni tekshirish", 'callback_data' => 'check_request']];
+    $buttons[] = [['text' => "✅ Tekshirish", 'callback_data' => 'check_request']];
 
     bot('sendMessage', [
         'chat_id' => $chatId,
-        'text' => "🛑 Botdan foydalanish uchun quyidagi kanal(lar)ga a'zo bo'ling / so'rov yuboring:",
+        'text' => "Quyidagi kanallarga qo'shiling:",
         'reply_markup' => json_encode(['inline_keyboard' => $buttons])
     ]);
 }
@@ -163,14 +141,20 @@ function sendChannelsPrompt($chatId, $missing) {
 function adminMainMenu($chatId) {
     bot('sendMessage', [
         'chat_id' => $chatId,
-        'text' => "👑 Admin panelga xush kelibsiz!",
+        'text' => "👑 Admin panel",
         'reply_markup' => json_encode([
             'inline_keyboard' => [
-                [['text' => '🎬 Anime qo\'shish', 'callback_data' => 'admin_add_anime']],
-                [['text' => '➕ Anime qismini qo\'shish', 'callback_data' => 'admin_add_part']],
-                [['text' => '📢 Ochiq kanal qo\'shish', 'callback_data' => 'admin_add_open']],
-                [['text' => '🔒 Yopiq kanal qo\'shish', 'callback_data' => 'admin_add_closed']],
-                [['text' => '📋 Kanallar ro\'yxati', 'callback_data' => 'admin_list_channels']],
+                [
+                    ['text' => '🎬 Anime qo\'shish', 'callback_data' => 'admin_add_anime'],
+                    ['text' => '➕ Qism qo\'shish', 'callback_data' => 'admin_add_part']
+                ],
+                [
+                    ['text' => '📢 Ochiq kanal', 'callback_data' => 'admin_add_open'],
+                    ['text' => '🔒 Yopiq kanal', 'callback_data' => 'admin_add_closed']
+                ],
+                [
+                    ['text' => '📋 Kanallar', 'callback_data' => 'admin_list_channels']
+                ]
             ]
         ])
     ]);
@@ -182,9 +166,9 @@ function partsKeyboard($code, $parts, $currentPart = null) {
     $partNums = array_keys($parts);
     sort($partNums, SORT_NUMERIC);
     foreach ($partNums as $num) {
-        $label = ($currentPart == $num) ? "▶️ $num-qism" : "$num-qism";
+        $label = ($currentPart == $num) ? "• $num •" : "$num";
         $row[] = ['text' => $label, 'callback_data' => "part_{$code}_{$num}"];
-        if (count($row) == 4) {
+        if (count($row) == 5) {
             $buttons[] = $row;
             $row = [];
         }
@@ -197,17 +181,33 @@ function partsKeyboard($code, $parts, $currentPart = null) {
 
 function sendAnimePart($chatId, $code, $anime, $partNum) {
     if (!isset($anime['parts'][$partNum])) {
-        bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Bu qism topilmadi."]);
+        bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Topilmadi"]);
         return;
     }
     $fileId = $anime['parts'][$partNum];
     bot('sendVideo', [
         'chat_id' => $chatId,
         'video' => $fileId,
-        'caption' => "🎬 " . $anime['name'] . "\n📌 Kod: " . $code . " | " . $partNum . "-qism",
-        'reply_markup' => json_encode([
-            'inline_keyboard' => partsKeyboard($code, $anime['parts'], $partNum)
-        ])
+        'caption' => $anime['name'] . " | " . $partNum . "-qism",
+        'reply_markup' => json_encode(['inline_keyboard' => partsKeyboard($code, $anime['parts'], $partNum)])
+    ]);
+}
+
+// Video qismini eski xabarni tahrirlab (edit) almashtiradi
+function editAnimePart($chatId, $messageId, $code, $anime, $partNum) {
+    if (!isset($anime['parts'][$partNum])) {
+        return;
+    }
+    $fileId = $anime['parts'][$partNum];
+    bot('editMessageMedia', [
+        'chat_id' => $chatId,
+        'message_id' => $messageId,
+        'media' => json_encode([
+            'type' => 'video',
+            'media' => $fileId,
+            'caption' => $anime['name'] . " | " . $partNum . "-qism"
+        ]),
+        'reply_markup' => json_encode(['inline_keyboard' => partsKeyboard($code, $anime['parts'], $partNum)])
     ]);
 }
 
@@ -229,6 +229,7 @@ if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $cbId = $callback['id'];
     $chatId = $callback['message']['chat']['id'];
+    $messageId = $callback['message']['message_id'];
     $userId = (string)$callback['from']['id'];
     $data = $callback['data'];
 
@@ -241,26 +242,15 @@ if (isset($update['callback_query'])) {
                 markApproved($db, $userId, (string)$chId);
             }
             saveDB($db);
-            bot('answerCallbackQuery', [
-                'callback_query_id' => $cbId,
-                'text' => "Muvaffaqiyatli tasdiqlandi! ✅",
-                'show_alert' => false
-            ]);
-            bot('sendMessage', [
-                'chat_id' => $chatId,
-                'text' => "Xush kelibsiz! 🎉 Endi anime kodini yuborishingiz mumkin 💬"
-            ]);
+            bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "✅ Tasdiqlandi"]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "🎉 Endi anime kodini yuboring"]);
         } else {
-            bot('answerCallbackQuery', [
-                'callback_query_id' => $cbId,
-                'text' => "Siz hali barcha shartlarni bajarmadingiz! ❌",
-                'show_alert' => true
-            ]);
+            bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "❌ Hali qo'shilmadingiz", 'show_alert' => true]);
         }
         exit;
     }
 
-    // ---- Foydalanuvchi: anime qismini tanlash ----
+    // ---- Foydalanuvchi: anime qismini tanlash (eski xabar tahrirlanadi) ----
     if (strpos($data, 'part_') === 0) {
         $parts = explode('_', $data);
         $code = $parts[1];
@@ -268,7 +258,7 @@ if (isset($update['callback_query'])) {
 
         if (isset($db['animes'][$code])) {
             bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
-            sendAnimePart($chatId, $code, $db['animes'][$code], $partNum);
+            editAnimePart($chatId, $messageId, $code, $db['animes'][$code], $partNum);
         } else {
             bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Topilmadi', 'show_alert' => true]);
         }
@@ -282,26 +272,23 @@ if (isset($update['callback_query'])) {
             setState($db, $userId, ['action' => 'awaiting_anime_name']);
             saveDB($db);
             bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
-            bot('sendMessage', [
-                'chat_id' => $chatId,
-                'text' => "✏️ Yangi anime nomini yuboring:"
-            ]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "✏️ Anime nomini yuboring:"]);
             exit;
         }
 
         if ($data == 'admin_add_part') {
             if (empty($db['animes'])) {
-                bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Avval anime qo\'shing.', 'show_alert' => true]);
+                bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Avval anime qo\'shing', 'show_alert' => true]);
                 exit;
             }
             setState($db, $userId, ['action' => 'awaiting_part_code']);
             saveDB($db);
             bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
 
-            $list = "📋 Qism qo'shmoqchi bo'lgan anime kodini yuboring:\n\n";
+            $list = "📋 Kod yuboring:\n\n";
             foreach ($db['animes'] as $code => $a) {
                 $partsCount = isset($a['parts']) ? count($a['parts']) : 0;
-                $list .= "🔹 $code — {$a['name']} ({$partsCount} qism)\n";
+                $list .= "$code — {$a['name']} ({$partsCount})\n";
             }
             bot('sendMessage', ['chat_id' => $chatId, 'text' => $list]);
             exit;
@@ -312,18 +299,14 @@ if (isset($update['callback_query'])) {
             setState($db, $userId, ['action' => 'awaiting_channel_id', 'type' => $type]);
             saveDB($db);
             bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
-            $label = $type == 'open' ? 'Ochiq (a\'zo bo\'lish kifoya)' : 'Yopiq (so\'rov kerak)';
-            bot('sendMessage', [
-                'chat_id' => $chatId,
-                'text' => "🔗 $label kanal ID sini yuboring (Masalan: -100123456789):"
-            ]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "🔗 Kanal ID yuboring:"]);
             exit;
         }
 
         if ($data == 'admin_list_channels') {
             bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
             if (empty($db['channels'])) {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "📭 Hozircha kanallar yo'q."]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "📭 Kanallar yo'q"]);
                 exit;
             }
             $buttons = [];
@@ -334,12 +317,12 @@ if (isset($update['callback_query'])) {
                 $title = isset($chatInfo['result']['title']) ? $chatInfo['result']['title'] : $chId;
                 $buttons[] = [
                     ['text' => "$emoji $title", 'callback_data' => 'noop'],
-                    ['text' => "🗑 O'chirish", 'callback_data' => 'del_channel_' . $chId]
+                    ['text' => "🗑", 'callback_data' => 'del_channel_' . $chId]
                 ];
             }
             bot('sendMessage', [
                 'chat_id' => $chatId,
-                'text' => "📋 Kanallar ro'yxati:",
+                'text' => "📋 Kanallar:",
                 'reply_markup' => json_encode(['inline_keyboard' => $buttons])
             ]);
             exit;
@@ -351,7 +334,7 @@ if (isset($update['callback_query'])) {
                 unset($db['channels'][$chId]);
                 saveDB($db);
                 bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => "O'chirildi ✅"]);
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "🗑 Kanal o'chirildi: $chId"]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "🗑 O'chirildi: $chId"]);
             } else {
                 bot('answerCallbackQuery', ['callback_query_id' => $cbId, 'text' => 'Topilmadi', 'show_alert' => true]);
             }
@@ -385,10 +368,7 @@ if (isset($update['message'])) {
         }
 
         if ($text == '/start') {
-            bot('sendMessage', [
-                'chat_id' => $chatId,
-                'text' => "👋 Salom! Anime kodini yuboring 🔍"
-            ]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "👋 Anime kodini yuboring"]);
             exit;
         }
 
@@ -398,16 +378,10 @@ if (isset($update['message'])) {
                 if (!empty($anime['parts'])) {
                     sendAnimePart($chatId, $text, $anime, 1);
                 } else {
-                    bot('sendMessage', [
-                        'chat_id' => $chatId,
-                        'text' => "⏳ \"" . $anime['name'] . "\" tez orada qo'shiladi, hali qismlari yo'q."
-                    ]);
+                    bot('sendMessage', ['chat_id' => $chatId, 'text' => "⏳ \"" . $anime['name'] . "\" hali yo'q"]);
                 }
             } else {
-                bot('sendMessage', [
-                    'chat_id' => $chatId,
-                    'text' => "🤷‍♂️ Afsuski, bu kodga tegishli anime topilmadi."
-                ]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "🤷‍♂️ Topilmadi"]);
             }
             exit;
         }
@@ -433,16 +407,12 @@ if (isset($update['message'])) {
                     $db['channels'][$text] = ['type' => $state['type']];
                     clearState($db, $userId);
                     saveDB($db);
-                    $label = $state['type'] == 'open' ? 'Ochiq' : 'Yopiq';
-                    bot('sendMessage', [
-                        'chat_id' => $chatId,
-                        'text' => "✅ $label kanal muvaffaqiyatli qo'shildi ID: " . $text
-                    ]);
+                    bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Qo'shildi"]);
                 } else {
-                    bot('sendMessage', ['chat_id' => $chatId, 'text' => "⚠️ Bu kanal allaqachon qo'shilgan."]);
+                    bot('sendMessage', ['chat_id' => $chatId, 'text' => "⚠️ Allaqachon bor"]);
                 }
             } else {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Noto'g'ri format. Masalan: -100123456789"]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Noto'g'ri format"]);
             }
             exit;
         }
@@ -451,16 +421,13 @@ if (isset($update['message'])) {
         if ($state && $state['action'] == 'awaiting_anime_name') {
             if ($text !== '') {
                 $db['last_anime_num']++;
-                $code = str_pad($db['last_anime_num'], 4, '0', STR_PAD_LEFT);
+                $code = (string)$db['last_anime_num'];
                 $db['animes'][$code] = ['name' => $text, 'parts' => []];
                 setState($db, $userId, ['action' => 'awaiting_anime_video', 'code' => $code]);
                 saveDB($db);
-                bot('sendMessage', [
-                    'chat_id' => $chatId,
-                    'text' => "✅ Anime qo'shildi!\n📌 Kod: $code\n🎬 Nom: $text\n\n📥 Endi 1-qism videosini yuboring:"
-                ]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Kod: $code\n📥 1-qism videoni yuboring:"]);
             } else {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Anime nomini matn ko'rinishida yuboring."]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Matn yuboring"]);
             }
             exit;
         }
@@ -472,10 +439,7 @@ if (isset($update['message'])) {
             $db['animes'][$code]['parts'][1] = $fileId;
             clearState($db, $userId);
             saveDB($db);
-            bot('sendMessage', [
-                'chat_id' => $chatId,
-                'text' => "💾 1-qism saqlandi!\n📌 Kod: $code\n\nKeyingi qismlarni qo'shish uchun \"➕ Anime qismini qo'shish\" tugmasidan foydalaning."
-            ]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "💾 Saqlandi (Kod: $code)"]);
             exit;
         }
 
@@ -485,12 +449,9 @@ if (isset($update['message'])) {
                 setState($db, $userId, ['action' => 'awaiting_part_video', 'code' => $text]);
                 saveDB($db);
                 $nextPart = count($db['animes'][$text]['parts']) + 1;
-                bot('sendMessage', [
-                    'chat_id' => $chatId,
-                    'text' => "📥 \"" . $db['animes'][$text]['name'] . "\" uchun {$nextPart}-qism videosini yuboring:"
-                ]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "📥 {$nextPart}-qism videoni yuboring:"]);
             } else {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Bunday kod topilmadi. Qaytadan urinib ko'ring."]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Topilmadi"]);
             }
             exit;
         }
@@ -503,10 +464,7 @@ if (isset($update['message'])) {
             $db['animes'][$code]['parts'][$nextPart] = $fileId;
             clearState($db, $userId);
             saveDB($db);
-            bot('sendMessage', [
-                'chat_id' => $chatId,
-                'text' => "💾 {$nextPart}-qism saqlandi!\n📌 Kod: $code"
-            ]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "💾 Saqlandi ({$nextPart}-qism)"]);
             exit;
         }
 
