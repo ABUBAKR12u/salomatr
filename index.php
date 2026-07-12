@@ -3,9 +3,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-// Eng asosiy o'zgarish: ID raqam endi matn (String) formatida
+// Token va Admin ID (Barcha ko'rinmas simvollar tozalandi)
 define('TOKEN', '8556626236:AAHraU5HfOIKOZUDJOAc3i6rV5SYuW3vTf4');
-define('ADMIN_ID', '8105737095'); 
+define('ADMIN_ID', '8105737095');
 define('DB_FILE', 'database.json');
 
 $content = file_get_contents("php://input");
@@ -23,11 +23,13 @@ function saveDB($data) {
     file_put_contents(DB_FILE, json_encode($data, JSON_PRETTY_PRINT));
 }
 
+// TUZATILDI: Ichma-ich massivlarni (Inline tugmalarni) to'g'ri yuborish uchun cURL yangilandi
 function bot($method, $data = []) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot" . TOKEN . "/" . $method);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+    // http_build_query olib tashlandi, chunki u inline_keyboard massivini buzib yuborayotgan edi
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data); 
     $res = curl_exec($ch);
     curl_close($ch);
     return json_decode($res, true);
@@ -96,11 +98,6 @@ if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $cbId = $callback['id'];
     $chatId = $callback['message']['chat']['id'];
-    bot('sendMessage', [
-    'chat_id' => $update['callback_query']['message']['chat']['id'],
-    'text' => "🛠 Debug - Tugma: " . $update['callback_query']['data'] . " | Sizning ID: " . $update['callback_query']['from']['id']
-]);
-    // Yechim: userId qat'iy matn sifatida olinadi
     $userId = (string)$callback['from']['id']; 
     $data = $callback['data'];
 
@@ -139,8 +136,8 @@ if (isset($update['callback_query'])) {
         exit;
     }
 
-    // Yechim: ADMIN_ID bilan matnli aniq tekshiruv (===)
-    if ($userId === ADMIN_ID) {
+    // TUZATILDI: Admin ID tekshiruvi turi va qiymati bo'yicha to'g'rilandi
+    if ((string)$userId === (string)ADMIN_ID) {
         if ($data === 'adm_add_ch') {
             $db['states'][$userId] = 'wait_ch_id';
             saveDB($db);
@@ -201,11 +198,11 @@ if (isset($update['callback_query'])) {
 if (isset($update['message'])) {
     $message = $update['message'];
     $chatId = $message['chat']['id'];
-    $userId = (string)$message['from']['id']; // Yechim: matn
+    $userId = (string)$message['from']['id']; 
     $text = isset($message['text']) ? trim($message['text']) : '';
     $state = isset($db['states'][$userId]) ? $db['states'][$userId] : '';
 
-    if ($userId !== ADMIN_ID) {
+    if ((string)$userId !== (string)ADMIN_ID) {
         if (!checkSubscription($userId, $db)) {
             bot('sendMessage', [
                 'chat_id' => $chatId,
@@ -245,7 +242,7 @@ if (isset($update['message'])) {
         }
     }
 
-    if ($userId === ADMIN_ID) {
+    if ((string)$userId === (string)ADMIN_ID) {
         if ($text === '/start') {
             unset($db['states'][$userId]);
             saveDB($db);
