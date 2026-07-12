@@ -96,7 +96,10 @@ if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $cbId = $callback['id'];
     $chatId = $callback['message']['chat']['id'];
-    
+    bot('sendMessage', [
+    'chat_id' => $update['callback_query']['message']['chat']['id'],
+    'text' => "🛠 Debug - Tugma: " . $update['callback_query']['data'] . " | Sizning ID: " . $update['callback_query']['from']['id']
+]);
     // Yechim: userId qat'iy matn sifatida olinadi
     $userId = (string)$callback['from']['id']; 
     $data = $callback['data'];
