@@ -3,9 +3,8 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-// Token va Admin ID (Barcha ko'rinmas simvollar tozalandi)
 define('TOKEN', '8556626236:AAHraU5HfOIKOZUDJOAc3i6rV5SYuW3vTf4');
-define('ADMIN_ID', '8105737095');
+define('ADMIN_ID', '8105737095'); 
 define('DB_FILE', 'database.json');
 
 $content = file_get_contents("php://input");
@@ -23,13 +22,11 @@ function saveDB($data) {
     file_put_contents(DB_FILE, json_encode($data, JSON_PRETTY_PRINT));
 }
 
-// TUZATILDI: Ichma-ich massivlarni (Inline tugmalarni) to'g'ri yuborish uchun cURL yangilandi
 function bot($method, $data = []) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot" . TOKEN . "/" . $method);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    // http_build_query olib tashlandi, chunki u inline_keyboard massivini buzib yuborayotgan edi
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data); 
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
     $res = curl_exec($ch);
     curl_close($ch);
     return json_decode($res, true);
@@ -98,6 +95,8 @@ if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $cbId = $callback['id'];
     $chatId = $callback['message']['chat']['id'];
+    
+    // ID bu yerda majburiy matnga o'tkazildi, taqqoslashda muammo bo'lmaydi
     $userId = (string)$callback['from']['id']; 
     $data = $callback['data'];
 
@@ -136,8 +135,8 @@ if (isset($update['callback_query'])) {
         exit;
     }
 
-    // TUZATILDI: Admin ID tekshiruvi turi va qiymati bo'yicha to'g'rilandi
-    if ((string)$userId === (string)ADMIN_ID) {
+    // TUZATILDI: Ikkala tomon ham qat'iy matn ko'rinishida taqqoslanmoqda (=== endi xato bermaydi)
+    if ($userId === (string)ADMIN_ID) {
         if ($data === 'adm_add_ch') {
             $db['states'][$userId] = 'wait_ch_id';
             saveDB($db);
@@ -202,7 +201,7 @@ if (isset($update['message'])) {
     $text = isset($message['text']) ? trim($message['text']) : '';
     $state = isset($db['states'][$userId]) ? $db['states'][$userId] : '';
 
-    if ((string)$userId !== (string)ADMIN_ID) {
+    if ($userId !== (string)ADMIN_ID) {
         if (!checkSubscription($userId, $db)) {
             bot('sendMessage', [
                 'chat_id' => $chatId,
@@ -242,7 +241,7 @@ if (isset($update['message'])) {
         }
     }
 
-    if ((string)$userId === (string)ADMIN_ID) {
+    if ($userId === (string)ADMIN_ID) {
         if ($text === '/start') {
             unset($db['states'][$userId]);
             saveDB($db);
