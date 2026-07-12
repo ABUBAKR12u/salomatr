@@ -95,7 +95,6 @@ if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $cbId = $callback['id'];
     $chatId = $callback['message']['chat']['id'];
-    $messageId = $callback['message']['message_id'];
     $userId = (string)$callback['from']['id'];
     $data = $callback['data'];
 
@@ -110,6 +109,7 @@ if (isset($update['callback_query'])) {
     }
 
     if (strpos($data, 'view_part_') === 0) {
+        bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
         $parts = explode('_', $data);
         $animeId = $parts[2];
         $partNum = $parts[3];
@@ -129,25 +129,26 @@ if (isset($update['callback_query'])) {
                 'caption' => "🍿 Anime: $animeName\n🔢 Qism: $partNum\n🆔 Kod: $animeId",
                 'reply_markup' => json_encode(['inline_keyboard' => $keyboard])
             ]);
-            bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
         }
         exit;
     }
 
     if ($userId == ADMIN_ID) {
+        bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
+
         if ($data === 'adm_add_ch') {
             $db['states'][$userId] = 'wait_ch_id';
             saveDB($db);
-            bot('sendMessage', ['chat_id' => $chatId, 'text' => "Kanal ID raqamini yuboring (Masalan: -100123456789):"]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "➕ Kanal ID raqamini yuboring (Masalan: -100123456789):"]);
         }
         elseif ($data === 'adm_list_ch') {
             if (empty($db['channels'])) {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "Kanallar qo'shilmagan.", 'reply_markup' => getAdminKeyboard()]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "📭 Kanallar qo'shilmagan.", 'reply_markup' => getAdminKeyboard()]);
             } else {
                 $text = "📢 Kanallar ro'yxati:\n\n";
                 $buttons = [];
                 foreach ($db['channels'] as $id => $type) {
-                    $text .= "🆔 `$id` [Type: $type]\n";
+                    $text .= "🆔 `$id` [Turi: $type]\n";
                     $buttons[] = [['text' => "🗑 O'chirish: $id", 'callback_data' => "del_ch_$id"]];
                 }
                 $buttons[] = [['text' => "🔙 Orqaga", 'callback_data' => 'adm_main']];
@@ -159,7 +160,7 @@ if (isset($update['callback_query'])) {
             if (isset($db['channels'][$targetCh])) {
                 unset($db['channels'][$targetCh]);
                 saveDB($db);
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "Kanal muvaffaqiyatli o'chirildi!", 'reply_markup' => getAdminKeyboard()]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "🗑 Kanal muvaffaqiyatli o'chirildi!", 'reply_markup' => getAdminKeyboard()]);
             }
         }
         elseif ($data === 'adm_new_anime') {
@@ -170,14 +171,24 @@ if (isset($update['callback_query'])) {
         elseif ($data === 'adm_add_part') {
             $db['states'][$userId] = 'wait_part_code';
             saveDB($db);
-            bot('sendMessage', ['chat_id' => $chatId, 'text' => "Qism qo'shmoqchi bo'lgan anime kodini yuboring:"]);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "➕ Qism qo'shmoqchi bo'lgan anime kodini yuboring:"]);
         }
         elseif ($data === 'adm_main') {
             unset($db['states'][$userId]);
             saveDB($db);
             bot('sendMessage', ['chat_id' => $chatId, 'text' => "👑 Admin boshqaruv paneli:", 'reply_markup' => getAdminKeyboard()]);
         }
-        bot('answerCallbackQuery', ['callback_query_id' => $cbId]);
+        elseif (strpos($data, 'set_type_') === 0) {
+            $type = substr($data, 9);
+            $tempId = isset($db['temp_ch_id']) ? $db['temp_ch_id'] : '';
+            if ($tempId) {
+                $db['channels'][$tempId] = $type;
+                unset($db['temp_ch_id']);
+                unset($db['states'][$userId]);
+                saveDB($db);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Kanal muvaffaqiyatli saqlandi!\n🆔 ID: `$tempId`\n🌐 Turi: $type", 'parse_mode' => 'Markdown', 'reply_markup' => getAdminKeyboard()]);
+            }
+        }
     }
     exit;
 }
@@ -245,18 +256,14 @@ if (isset($update['message'])) {
                 
                 $typeKb = json_encode([
                     'inline_keyboard' => [
-                        [['text' => "🔓 Ochiq (Public)", 'callback_data' => "set_type_ochiq"], ['text' => "🔒 Yopiq (Private/Request)", 'callback_data' => "set_type_yopiq"]]
+                        [['text' => "🔓 Ochiq (Public)", 'callback_data' => "set_type_ochiq"], ['text' => "🔒 Yopiq (Private)", 'callback_data' => "set_type_yopiq"]]
                     ]
                 ]);
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "Kanal turini tanlang:", 'reply_markup' => $typeKb]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "🌐 Kanal turini tanlang:", 'reply_markup' => $typeKb]);
             } else {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "Xato ID format. Qayta urinib ko'ring:", 'reply_markup' => getAdminKeyboard()]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Xato ID format. Qayta urinib ko'ring (ID manfiy son bo'lishi kerak):", 'reply_markup' => getAdminKeyboard()]);
             }
             exit;
-        }
-
-        if (isset($update['callback_query']) || ($state === 'wait_ch_type' && strpos($text, 'set_type_') === 0)) {
-            // Handled type logic inside regular post if text acts as triggers or callback
         }
 
         if ($state === 'wait_anime_name' && $text !== '') {
@@ -267,7 +274,7 @@ if (isset($update['message'])) {
             $db['animes'][$newCode] = ['name' => $text, 'parts' => []];
             $db['states'][$userId] = "wait_anime_video_" . $newCode;
             saveDB($db);
-            bot('sendMessage', ['chat_id' => $chatId, 'text' => "🍿 Anime: *$text* muvaffaqiyatli ochildi!\n🆔 Avtomatik Kod: `$newCode` \n\nEndi ushbu animening *1-qism* videosini yuboring (caption shart emas):", 'parse_mode' => 'Markdown']);
+            bot('sendMessage', ['chat_id' => $chatId, 'text' => "🍿 Anime: *$text* muvaffaqiyatli ochildi!\n🆔 Avtomatik Kod: `$newCode` \n\nEndi ushbu animening *1-qism* videosini yuboring:", 'parse_mode' => 'Markdown']);
             exit;
         }
 
@@ -280,7 +287,7 @@ if (isset($update['message'])) {
                 saveDB($db);
                 bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Anime muvaffaqiyatli saqlandi!\n🍿 Nomi: " . $db['animes'][$animeCode]['name'] . "\n🆔 Kod: `$animeCode`", 'parse_mode' => 'Markdown', 'reply_markup' => getAdminKeyboard()]);
             } else {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "Iltimos, video formatida yuboring!"]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Iltimos, video formatida yuboring!"]);
             }
             exit;
         }
@@ -292,7 +299,7 @@ if (isset($update['message'])) {
                 saveDB($db);
                 bot('sendMessage', ['chat_id' => $chatId, 'text' => "🍿 Anime: *" . $db['animes'][$text]['name'] . "*\n🔢 Qo'shilayotgan qism: *$nextPart*\n\nUshbu qism videosini yuklang:", 'parse_mode' => 'Markdown']);
             } else {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "Bunday kodli anime topilmadi! Qayta kiriting:", 'reply_markup' => getAdminKeyboard()]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Bunday kodli anime topilmadi! Qayta kiriting:", 'reply_markup' => getAdminKeyboard()]);
             }
             exit;
         }
@@ -308,29 +315,9 @@ if (isset($update['message'])) {
                 saveDB($db);
                 bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ *" . $db['animes'][$animeCode]['name'] . "* animesiga *$partNum-qism* muvaffaqiyatli qo'shildi!", 'parse_mode' => 'Markdown', 'reply_markup' => getAdminKeyboard()]);
             } else {
-                bot('sendMessage', ['chat_id' => $chatId, 'text' => "Iltimos, video yuboring!"]);
+                bot('sendMessage', ['chat_id' => $chatId, 'text' => "❌ Iltimos, video yuboring!"]);
             }
             exit;
-        }
-    }
-}
-
-// Qo'shimcha callback_query holati - Kanal Turini Tanlash mantiqi uchun
-if (isset($update['callback_query'])) {
-    $callback = $update['callback_query'];
-    $userId = (string)$callback['from']['id'];
-    $data = $callback['data'];
-    $chatId = $callback['message']['chat']['id'];
-    
-    if ($userId == ADMIN_ID && strpos($data, 'set_type_') === 0) {
-        $type = substr($data, 9);
-        $tempId = $db['temp_ch_id'];
-        if ($tempId) {
-            $db['channels'][$tempId] = $type;
-            unset($db['temp_ch_id']);
-            unset($db['states'][$userId]);
-            saveDB($db);
-            bot('sendMessage', ['chat_id' => $chatId, 'text' => "✅ Kanal muvaffaqiyatli saqlandi!\n🆔 ID: $tempId\n🌐 Turi: $type", 'reply_markup' => getAdminKeyboard()]);
         }
     }
 }
