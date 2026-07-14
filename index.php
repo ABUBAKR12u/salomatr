@@ -3,7 +3,7 @@
 error_reporting(0);
 ini_set('display_errors', 0);
 
-define('TOKEN', '8556626236:AAHraU5HfOIKOZUDJOAc3i6rV5SYuW3vTf4');
+define('TOKEN', '8556626236:AAHraU5HfOIKOZUDJOAc3i6rV5SYuW3avTf4');
 define('ADMIN_ID', 8105737095);
 define('DB_FILE', 'database.json');
 
